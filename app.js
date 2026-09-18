@@ -1,76 +1,17 @@
 (function () {
-"use strict";
+    "use strict";
 
-```
-const THREE_CDN =
-    "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.min.js";
+    if (typeof THREE === "undefined") {
+        throw new Error("Three.js r128 is not loaded.");
+    }
 
-const canvas = document.getElementById("infiniteCanvas");
-const coordinateX = document.getElementById("coordinateX");
-const coordinateY = document.getElementById("coordinateY");
+    const canvas = document.getElementById("infiniteCanvas");
+    const coordinateX = document.getElementById("coordinateX");
+    const coordinateY = document.getElementById("coordinateY");
 
-if (!canvas) {
-    throw new Error("Element #infiniteCanvas was not found.");
-}
-
-function loadThreeJS() {
-    return new Promise(function (resolve, reject) {
-        if (window.THREE) {
-            resolve();
-            return;
-        }
-
-        const existingScript = document.querySelector(
-            'script[src="' + THREE_CDN + '"]'
-        );
-
-        if (existingScript) {
-            existingScript.addEventListener("load", resolve, {
-                once: true
-            });
-
-            existingScript.addEventListener("error", reject, {
-                once: true
-            });
-
-            return;
-        }
-
-        const script = document.createElement("script");
-
-        script.src = THREE_CDN;
-        script.async = true;
-
-        script.onload = function () {
-            if (window.THREE) {
-                resolve();
-            } else {
-                reject(
-                    new Error("Three.js loaded but window.THREE is unavailable.")
-                );
-            }
-        };
-
-        script.onerror = function () {
-            reject(
-                new Error("Failed to load Three.js from the CDN.")
-            );
-        };
-
-        document.head.appendChild(script);
-    });
-}
-
-loadThreeJS()
-    .then(function () {
-        initializeInfiniteCanvas();
-    })
-    .catch(function (error) {
-        console.error(error);
-    });
-
-function initializeInfiniteCanvas() {
-    const THREE = window.THREE;
+    if (!canvas) {
+        throw new Error('Canvas element with ID "infiniteCanvas" was not found.');
+    }
 
     const scene = new THREE.Scene();
 
@@ -86,22 +27,11 @@ function initializeInfiniteCanvas() {
     const renderer = new THREE.WebGLRenderer({
         canvas: canvas,
         antialias: true,
-        alpha: false,
         powerPreference: "high-performance"
     });
 
-    renderer.setPixelRatio(
-        Math.min(window.devicePixelRatio || 1, 2)
-    );
-
-    renderer.setSize(
-        window.innerWidth,
-        window.innerHeight
-    );
-
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-    renderer.setAnimationLoop(animate);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
 
     const ambientLight = new THREE.AmbientLight(
         0xffffff,
@@ -112,138 +42,68 @@ function initializeInfiniteCanvas() {
 
     const directionalLight = new THREE.DirectionalLight(
         0xffffff,
-        2.5
+        2
     );
 
-    directionalLight.position.set(
-        30,
-        50,
-        20
-    );
-
+    directionalLight.position.set(20, 50, 20);
     scene.add(directionalLight);
 
-    const planeSize = 100000;
-
-    const planeGeometry = new THREE.PlaneGeometry(
-        planeSize,
-        planeSize
+    const groundGeometry = new THREE.PlaneGeometry(
+        100000,
+        100000
     );
 
-    const planeMaterial = new THREE.MeshBasicMaterial({
+    const groundMaterial = new THREE.MeshBasicMaterial({
         color: 0x0b0b0e,
         side: THREE.DoubleSide
     });
 
-    const plane = new THREE.Mesh(
-        planeGeometry,
-        planeMaterial
+    const ground = new THREE.Mesh(
+        groundGeometry,
+        groundMaterial
     );
 
-    plane.rotation.x = -Math.PI / 2;
-    plane.position.y = 0;
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.01;
 
-    scene.add(plane);
+    scene.add(ground);
 
-    const gridGroup = new THREE.Group();
-
-    scene.add(gridGroup);
-
-    const GRID_SIZE = 200;
-    const GRID_DIVISIONS = 200;
+    const gridSize = 500;
+    const gridDivisions = 500;
 
     const grid = new THREE.GridHelper(
-        GRID_SIZE,
-        GRID_DIVISIONS,
-        0x282830,
-        0x15151b
+        gridSize,
+        gridDivisions,
+        0x303038,
+        0x18181e
     );
 
-    grid.position.y = 0.01;
+    grid.position.y = 0;
 
-    gridGroup.add(grid);
+    scene.add(grid);
 
-    const xAxisGeometry =
-        new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(
-                -GRID_SIZE / 2,
-                0.015,
-                0
-            ),
-            new THREE.Vector3(
-                GRID_SIZE / 2,
-                0.015,
-                0
-            )
-        ]);
-
-    const zAxisGeometry =
-        new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(
-                0,
-                0.015,
-                -GRID_SIZE / 2
-            ),
-            new THREE.Vector3(
-                0,
-                0.015,
-                GRID_SIZE / 2
-            )
-        ]);
-
-    const xAxisMaterial = new THREE.LineBasicMaterial({
-        color: 0x40404b,
-        transparent: true,
-        opacity: 0.7
-    });
-
-    const zAxisMaterial = new THREE.LineBasicMaterial({
-        color: 0x40404b,
-        transparent: true,
-        opacity: 0.7
-    });
-
-    const xAxis = new THREE.Line(
-        xAxisGeometry,
-        xAxisMaterial
+    const cubeGeometry = new THREE.BoxGeometry(
+        1,
+        1,
+        1
     );
 
-    const zAxis = new THREE.Line(
-        zAxisGeometry,
-        zAxisMaterial
-    );
-
-    gridGroup.add(xAxis);
-    gridGroup.add(zAxis);
+    const cubes = [];
 
     const objectsGroup = new THREE.Group();
 
     scene.add(objectsGroup);
 
-    const cubes = [];
-
-    const cubeGeometry = new THREE.BoxGeometry(
-        0.9,
-        0.9,
-        0.9
-    );
-
-    const cubeEdgesGeometry =
-        new THREE.EdgesGeometry(cubeGeometry);
-
     const raycaster = new THREE.Raycaster();
 
     const mouse = new THREE.Vector2();
 
-    const intersectionPoint =
-        new THREE.Vector3();
-
-    const groundPlane = new THREE.Plane(
+    const horizontalPlane = new THREE.Plane(
         new THREE.Vector3(0, 1, 0),
         0
     );
 
-    const cameraTarget = new THREE.Vector3();
+    const intersection = new THREE.Vector3();
 
     let cameraX = 0;
     let cameraZ = 0;
@@ -255,120 +115,47 @@ function initializeInfiniteCanvas() {
     let targetCameraDistance = 35;
 
     let isDragging = false;
-    let movedDuringDrag = false;
+    let dragMoved = false;
 
     let dragStartX = 0;
     let dragStartY = 0;
 
-    let dragOriginX = 0;
-    let dragOriginZ = 0;
+    let dragCameraStartX = 0;
+    let dragCameraStartZ = 0;
 
     let pointerDownTime = 0;
 
-    const GRID_SNAP = 1;
+    const gridSnap = 1;
 
     function snapToGrid(value) {
-        return Math.round(
-            value / GRID_SNAP
-        ) * GRID_SNAP;
+        return Math.round(value / gridSnap) * gridSnap;
     }
 
-    function updateGrid() {
-        const gridX =
-            Math.floor(cameraX / GRID_SIZE) *
-            GRID_SIZE;
-
-        const gridZ =
-            Math.floor(cameraZ / GRID_SIZE) *
-            GRID_SIZE;
-
-        gridGroup.position.x = gridX;
-        gridGroup.position.z = gridZ;
-    }
-
-    function updateCamera() {
-        cameraX = THREE.MathUtils.lerp(
-            cameraX,
-            targetCameraX,
-            0.16
-        );
-
-        cameraZ = THREE.MathUtils.lerp(
-            cameraZ,
-            targetCameraZ,
-            0.16
-        );
-
-        cameraDistance = THREE.MathUtils.lerp(
-            cameraDistance,
-            targetCameraDistance,
-            0.14
-        );
-
-        const cameraHeight =
-            cameraDistance * 0.86;
-
-        camera.position.set(
-            cameraX,
-            cameraHeight,
-            cameraZ + cameraDistance
-        );
-
-        cameraTarget.set(
-            cameraX,
-            0,
-            cameraZ
-        );
-
-        camera.lookAt(cameraTarget);
-
-        updateGrid();
-    }
-
-    function updateCoordinates() {
-        if (coordinateX) {
-            coordinateX.textContent =
-                Math.round(cameraX).toString();
-        }
-
-        if (coordinateY) {
-            coordinateY.textContent =
-                Math.round(cameraZ).toString();
-        }
-    }
-
-    function updateMouse(event) {
-        const rect =
-            canvas.getBoundingClientRect();
+    function updateMousePosition(event) {
+        const rect = canvas.getBoundingClientRect();
 
         mouse.x =
-            ((event.clientX - rect.left) /
-                rect.width) * 2 - 1;
+            ((event.clientX - rect.left) / rect.width) * 2 - 1;
 
         mouse.y =
-            -((event.clientY - rect.top) /
-                rect.height) * 2 + 1;
+            -((event.clientY - rect.top) / rect.height) * 2 + 1;
     }
 
-    function getGridIntersection(event) {
-        updateMouse(event);
+    function getPlaneIntersection(event) {
+        updateMousePosition(event);
 
-        raycaster.setFromCamera(
-            mouse,
-            camera
+        raycaster.setFromCamera(mouse, camera);
+
+        const hit = raycaster.ray.intersectPlane(
+            horizontalPlane,
+            intersection
         );
-
-        const hit =
-            raycaster.ray.intersectPlane(
-                groundPlane,
-                intersectionPoint
-            );
 
         if (!hit) {
             return null;
         }
 
-        return intersectionPoint.clone();
+        return intersection.clone();
     }
 
     function cubeExistsAt(x, z) {
@@ -376,10 +163,8 @@ function initializeInfiniteCanvas() {
             const cube = cubes[i];
 
             if (
-                Math.abs(cube.position.x - x) <
-                    0.001 &&
-                Math.abs(cube.position.z - z) <
-                    0.001
+                Math.abs(cube.position.x - x) < 0.001 &&
+                Math.abs(cube.position.z - z) < 0.001
             ) {
                 return true;
             }
@@ -393,14 +178,9 @@ function initializeInfiniteCanvas() {
             return;
         }
 
-        const material =
-            new THREE.MeshStandardMaterial({
-                color: 0x00eaff,
-                emissive: 0x00d9ff,
-                emissiveIntensity: 3,
-                metalness: 0.35,
-                roughness: 0.2
-            });
+        const material = new THREE.MeshBasicMaterial({
+            color: 0x00ffff
+        });
 
         const cube = new THREE.Mesh(
             cubeGeometry,
@@ -409,49 +189,24 @@ function initializeInfiniteCanvas() {
 
         cube.position.set(
             x,
-            0.45,
+            0.5,
             z
         );
 
-        cube.scale.setScalar(0.001);
-
-        cube.userData.spawnStart =
-            performance.now();
-
-        cube.userData.spawnDuration =
-            420;
-
-        cube.userData.targetScale =
-            1;
-
-        const edgeMaterial =
-            new THREE.LineBasicMaterial({
-                color: 0x8cffff,
-                transparent: true,
-                opacity: 0.95
-            });
-
-        const edges = new THREE.LineSegments(
-            cubeEdgesGeometry,
-            edgeMaterial
+        cube.scale.set(
+            0.001,
+            0.001,
+            0.001
         );
 
-        edges.scale.copy(
-            cube.scale
-        );
-
-        cube.add(edges);
-
-        cube.userData.edges = edges;
+        cube.userData.spawnProgress = 0;
 
         objectsGroup.add(cube);
-
         cubes.push(cube);
     }
 
-    function createCubeFromClick(event) {
-        const point =
-            getGridIntersection(event);
+    function handleCanvasClick(event) {
+        const point = getPlaneIntersection(event);
 
         if (!point) {
             return;
@@ -463,30 +218,88 @@ function initializeInfiniteCanvas() {
         createNeonCube(x, z);
     }
 
-    function panFromDrag(event) {
-        const deltaX =
-            event.clientX - dragStartX;
+    function updateCamera() {
+        cameraX = THREE.MathUtils.lerp(
+            cameraX,
+            targetCameraX,
+            0.12
+        );
 
-        const deltaY =
-            event.clientY - dragStartY;
+        cameraZ = THREE.MathUtils.lerp(
+            cameraZ,
+            targetCameraZ,
+            0.12
+        );
 
-        if (
-            Math.abs(deltaX) > 4 ||
-            Math.abs(deltaY) > 4
-        ) {
-            movedDuringDrag = true;
+        cameraDistance = THREE.MathUtils.lerp(
+            cameraDistance,
+            targetCameraDistance,
+            0.12
+        );
+
+        const cameraHeight =
+            cameraDistance * 0.8;
+
+        camera.position.set(
+            cameraX,
+            cameraHeight,
+            cameraZ + cameraDistance
+        );
+
+        camera.lookAt(
+            cameraX,
+            0,
+            cameraZ
+        );
+    }
+
+    function updateCoordinates() {
+        if (coordinateX) {
+            coordinateX.innerText =
+                Math.round(cameraX).toString();
         }
 
-        const panSpeed =
-            cameraDistance * 0.0022;
+        if (coordinateY) {
+            coordinateY.innerText =
+                Math.round(cameraZ).toString();
+        }
+    }
 
-        targetCameraX =
-            dragOriginX -
-            deltaX * panSpeed;
+    function updateInfiniteGrid() {
+        const gridOffsetX =
+            Math.floor(cameraX / gridSize) * gridSize;
 
-        targetCameraZ =
-            dragOriginZ +
-            deltaY * panSpeed;
+        const gridOffsetZ =
+            Math.floor(cameraZ / gridSize) * gridSize;
+
+        grid.position.x = gridOffsetX;
+        grid.position.z = gridOffsetZ;
+    }
+
+    function updateCubes() {
+        for (let i = 0; i < cubes.length; i++) {
+            const cube = cubes[i];
+
+            if (cube.userData.spawnProgress < 1) {
+                cube.userData.spawnProgress += 0.08;
+
+                if (cube.userData.spawnProgress > 1) {
+                    cube.userData.spawnProgress = 1;
+                }
+
+                const progress =
+                    cube.userData.spawnProgress;
+
+                const eased =
+                    1 - Math.pow(1 - progress, 3);
+
+                cube.scale.set(
+                    eased,
+                    eased,
+                    eased
+                );
+            }
+        }
     }
 
     canvas.addEventListener(
@@ -497,25 +310,18 @@ function initializeInfiniteCanvas() {
             }
 
             isDragging = true;
-            movedDuringDrag = false;
+            dragMoved = false;
 
             pointerDownTime =
                 performance.now();
 
-            dragStartX =
-                event.clientX;
+            dragStartX = event.clientX;
+            dragStartY = event.clientY;
 
-            dragStartY =
-                event.clientY;
+            dragCameraStartX = targetCameraX;
+            dragCameraStartZ = targetCameraZ;
 
-            dragOriginX =
-                targetCameraX;
-
-            dragOriginZ =
-                targetCameraZ;
-
-            canvas.style.cursor =
-                "grabbing";
+            canvas.style.cursor = "grabbing";
 
             canvas.setPointerCapture(
                 event.pointerId
@@ -530,7 +336,29 @@ function initializeInfiniteCanvas() {
                 return;
             }
 
-            panFromDrag(event);
+            const deltaX =
+                event.clientX - dragStartX;
+
+            const deltaY =
+                event.clientY - dragStartY;
+
+            if (
+                Math.abs(deltaX) > 4 ||
+                Math.abs(deltaY) > 4
+            ) {
+                dragMoved = true;
+            }
+
+            const panSpeed =
+                cameraDistance * 0.0025;
+
+            targetCameraX =
+                dragCameraStartX -
+                deltaX * panSpeed;
+
+            targetCameraZ =
+                dragCameraStartZ +
+                deltaY * panSpeed;
         }
     );
 
@@ -541,22 +369,21 @@ function initializeInfiniteCanvas() {
                 return;
             }
 
-            const duration =
+            const clickDuration =
                 performance.now() -
                 pointerDownTime;
 
-            const isClick =
-                !movedDuringDrag &&
-                duration < 350;
+            const wasClick =
+                !dragMoved &&
+                clickDuration < 350;
 
-            if (isClick) {
-                createCubeFromClick(event);
+            if (wasClick) {
+                handleCanvasClick(event);
             }
 
             isDragging = false;
 
-            canvas.style.cursor =
-                "crosshair";
+            canvas.style.cursor = "crosshair";
 
             try {
                 canvas.releasePointerCapture(
@@ -575,8 +402,7 @@ function initializeInfiniteCanvas() {
         function (event) {
             isDragging = false;
 
-            canvas.style.cursor =
-                "crosshair";
+            canvas.style.cursor = "crosshair";
 
             try {
                 canvas.releasePointerCapture(
@@ -596,82 +422,21 @@ function initializeInfiniteCanvas() {
             event.preventDefault();
 
             const zoomFactor =
-                Math.exp(
-                    event.deltaY * 0.0012
-                );
+                Math.exp(event.deltaY * 0.0015);
 
-            targetCameraDistance *=
-                zoomFactor;
+            targetCameraDistance *= zoomFactor;
 
             targetCameraDistance =
                 THREE.MathUtils.clamp(
                     targetCameraDistance,
                     5,
-                    300
+                    250
                 );
         },
         {
             passive: false
         }
     );
-
-    function updateCubes() {
-        const now =
-            performance.now();
-
-        for (let i = 0; i < cubes.length; i++) {
-            const cube = cubes[i];
-
-            const elapsed =
-                now -
-                cube.userData.spawnStart;
-
-            const progress =
-                THREE.MathUtils.clamp(
-                    elapsed /
-                        cube.userData.spawnDuration,
-                    0,
-                    1
-                );
-
-            const eased =
-                1 -
-                Math.pow(
-                    1 - progress,
-                    3
-                );
-
-            const scale =
-                Math.max(
-                    0.001,
-                    eased *
-                        cube.userData.targetScale
-                );
-
-            cube.scale.setScalar(scale);
-
-            if (cube.userData.edges) {
-                cube.userData.edges.scale.setScalar(
-                    1
-                );
-            }
-
-            cube.rotation.y += 0.004;
-        }
-    }
-
-    function animate() {
-        updateCamera();
-
-        updateCoordinates();
-
-        updateCubes();
-
-        renderer.render(
-            scene,
-            camera
-        );
-    }
 
     window.addEventListener(
         "resize",
@@ -683,10 +448,7 @@ function initializeInfiniteCanvas() {
             camera.updateProjectionMatrix();
 
             renderer.setPixelRatio(
-                Math.min(
-                    window.devicePixelRatio || 1,
-                    2
-                )
+                Math.min(window.devicePixelRatio, 2)
             );
 
             renderer.setSize(
@@ -698,22 +460,32 @@ function initializeInfiniteCanvas() {
 
     camera.position.set(
         0,
-        cameraDistance * 0.86,
-        cameraDistance
+        28,
+        35
     );
 
-    cameraTarget.set(
+    camera.lookAt(
         0,
         0,
         0
     );
 
-    camera.lookAt(cameraTarget);
-
-    updateGrid();
-
     updateCoordinates();
-}
-```
+    updateInfiniteGrid();
 
+    function animate() {
+        requestAnimationFrame(animate);
+
+        updateCamera();
+        updateCoordinates();
+        updateInfiniteGrid();
+        updateCubes();
+
+        renderer.render(
+            scene,
+            camera
+        );
+    }
+
+    animate();
 })();

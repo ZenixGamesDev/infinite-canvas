@@ -1,40 +1,28 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="The Infinite Canvas — an interactive infinite canvas experience.">
     <title>The Infinite Canvas</title>
-
-```
-<link rel="stylesheet" href="style.css">
-```
-
+    <link rel="stylesheet" href="style.css">
+    <!-- Подключаем стабильную версию Three.js прямо сюда -->
+    <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
-```
-<canvas id="infiniteCanvas"></canvas>
+    <canvas id="infiniteCanvas"></canvas>
 
-<div class="top-bar">
-    <div class="coordinates" aria-label="Current canvas coordinates">
-        <span>X: <strong id="coordinateX">0</strong></span>
-        <span>Y: <strong id="coordinateY">0</strong></span>
+    <div class="top-bar">
+        <div class="coordinates" aria-label="Current canvas coordinates">
+            <span>X: <strong id="coordinateX">0</strong></span>
+            <span>Y: <strong id="coordinateY">0</strong></span>
+        </div>
     </div>
-</div>
 
-<button
-    id="createObjectButton"
-    class="create-object-button"
-    type="button"
-    aria-label="Create a new object"
->
-    Create Object
-</button>
+    <button id="createObjectButton" class="create-object-button" type="button" aria-label="Create a new object">
+        Create Object
+    </button>
 
-<script src="app.js"></script>
-```
-
+    <script src="app.js"></script>
 </body>
 </html>
