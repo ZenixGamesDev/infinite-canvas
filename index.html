@@ -1,25 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Infinite Canvas</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Подключаем стабильную версию Three.js прямо сюда -->
+    <!-- Подключаем ядро Three.js -->
     <script src="https://cloudflare.com"></script>
+    <!-- Подключаем OrbitControls для управления мышкой (вращение, панорамирование, зум) -->
+    <script src="https://jsdelivr.net"></script>
 </head>
 <body>
 
     <canvas id="infiniteCanvas"></canvas>
 
     <div class="top-bar">
-        <div class="coordinates" aria-label="Current canvas coordinates">
+        <div class="coordinates">
             <span>X: <strong id="coordinateX">0</strong></span>
             <span>Y: <strong id="coordinateY">0</strong></span>
         </div>
     </div>
 
-    <button id="createObjectButton" class="create-object-button" type="button" aria-label="Create a new object">
+    <button id="createObjectButton" class="create-object-button" type="button">
         Create Object
     </button>
 
