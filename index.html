@@ -5,25 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Infinite Canvas</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Подключаем ядро Three.js -->
-    <script src="https://cloudflare.com"></script>
-    <!-- Подключаем OrbitControls для управления мышкой (вращение, панорамирование, зум) -->
-    <script src="https://jsdelivr.net"></script>
 </head>
 <body>
 
-    <canvas id="infiniteCanvas"></canvas>
-
     <div class="top-bar">
-        <div class="coordinates">
-            <span>X: <strong id="coordinateX">0</strong></span>
-            <span>Y: <strong id="coordinateY">0</strong></span>
-        </div>
+        <div>Бесконечный Холст 2D (Кликай и строй!)</div>
+        <div class="coordinates">X: <span id="coordinateX">0</span> | Y: <span id="coordinateY">0</span></div>
     </div>
 
-    <button id="createObjectButton" class="create-object-button" type="button">
-        Create Object
-    </button>
+    <canvas id="infiniteCanvas"></canvas>
 
     <script src="app.js"></script>
 </body>

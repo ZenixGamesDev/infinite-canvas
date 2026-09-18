@@ -11,15 +11,18 @@ body {
     margin: 0;
     padding: 0;
     overflow: hidden;
-    background: #0b0b0e;
 }
 
 body {
     position: relative;
     min-width: 100vw;
     min-height: 100vh;
+    background: #0d0e12;
     color: #ffffff;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
 }
@@ -36,27 +39,30 @@ body {
     padding: 0;
     border: 0;
     outline: none;
-    background: #0b0b0e;
+    background: #0d0e12;
     cursor: crosshair;
+    touch-action: none;
 }
 
 .top-bar {
     position: fixed;
     top: 20px;
-    left: 20px;
+    left: 50%;
     z-index: 10;
     display: flex;
     align-items: center;
-    min-height: 44px;
-    padding: 0 16px;
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    justify-content: center;
+    min-height: 42px;
+    padding: 0 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    background: rgba(8, 8, 12, 0.82);
+    background: rgba(8, 9, 13, 0.82);
     box-shadow:
         0 8px 30px rgba(0, 0, 0, 0.35),
         inset 0 1px 0 rgba(255, 255, 255, 0.04);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
+    transform: translateX(-50%);
     pointer-events: none;
     user-select: none;
 }
@@ -64,8 +70,9 @@ body {
 .coordinates {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 20px;
-    color: rgba(255, 255, 255, 0.68);
+    color: rgba(255, 255, 255, 0.72);
     font-family:
         "SFMono-Regular",
         "Cascadia Code",
@@ -92,7 +99,8 @@ body {
     font-weight: 600;
 }
 
-#createObjectButton {
+#createObjectButton,
+.create-object-button {
     position: fixed;
     right: 24px;
     bottom: 24px;
@@ -101,13 +109,13 @@ body {
     align-items: center;
     justify-content: center;
     min-width: 150px;
-    height: 46px;
+    height: 44px;
     padding: 0 20px;
     border: 1px solid rgba(0, 229, 255, 0.32);
     border-radius: 7px;
     outline: none;
-    background: rgba(10, 13, 18, 0.90);
-    color: rgba(255, 255, 255, 0.92);
+    background: rgba(10, 13, 18, 0.9);
+    color: rgba(255, 255, 255, 0.94);
     font-family:
         "SFMono-Regular",
         "Cascadia Code",
@@ -126,7 +134,7 @@ body {
     user-select: none;
     -webkit-tap-highlight-color: transparent;
     box-shadow:
-        0 8px 28px rgba(0, 0, 0, 0.40),
+        0 8px 28px rgba(0, 0, 0, 0.4),
         0 0 16px rgba(0, 229, 255, 0.04),
         inset 0 1px 0 rgba(255, 255, 255, 0.04);
     backdrop-filter: blur(14px);
@@ -139,10 +147,11 @@ body {
         box-shadow 180ms ease;
 }
 
-#createObjectButton:hover {
+#createObjectButton:hover,
+.create-object-button:hover {
     transform: translateY(-2px);
-    border-color: rgba(0, 229, 255, 0.75);
-    background: rgba(9, 24, 30, 0.95);
+    border-color: rgba(0, 229, 255, 0.78);
+    background: rgba(8, 24, 30, 0.96);
     color: #ffffff;
     box-shadow:
         0 12px 34px rgba(0, 0, 0, 0.45),
@@ -150,34 +159,36 @@ body {
         inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
-#createObjectButton:active {
+#createObjectButton:active,
+.create-object-button:active {
     transform: translateY(0);
-    border-color: rgba(0, 229, 255, 0.90);
+    border-color: rgba(0, 229, 255, 0.95);
     background: rgba(6, 17, 22, 0.98);
     box-shadow:
         0 5px 18px rgba(0, 0, 0, 0.38),
-        0 0 14px rgba(0, 229, 255, 0.10),
+        0 0 14px rgba(0, 229, 255, 0.1),
         inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
-#createObjectButton:focus {
+#createObjectButton:focus,
+.create-object-button:focus {
     outline: none;
 }
 
-#createObjectButton:focus-visible {
-    border-color: rgba(0, 229, 255, 0.90);
+#createObjectButton:focus-visible,
+.create-object-button:focus-visible {
+    border-color: rgba(0, 229, 255, 0.9);
     box-shadow:
         0 0 0 3px rgba(0, 229, 255, 0.12),
-        0 10px 34px rgba(0, 0, 0, 0.40),
+        0 10px 34px rgba(0, 0, 0, 0.4),
         0 0 22px rgba(0, 229, 255, 0.12);
 }
 
 @media (max-width: 600px) {
     .top-bar {
         top: 14px;
-        left: 14px;
         min-height: 40px;
-        padding: 0 13px;
+        padding: 0 14px;
     }
 
     .coordinates {
@@ -185,7 +196,8 @@ body {
         font-size: 11px;
     }
 
-    #createObjectButton {
+    #createObjectButton,
+    .create-object-button {
         right: 14px;
         bottom: 14px;
         min-width: 136px;
@@ -196,7 +208,8 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    #createObjectButton {
+    #createObjectButton,
+    .create-object-button {
         transition: none;
     }
 }

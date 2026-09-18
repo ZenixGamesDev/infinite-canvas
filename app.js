@@ -1,503 +1,922 @@
 "use strict";
 
 (function () {
-    if (typeof THREE === "undefined") {
-        throw new Error("Three.js is not loaded.");
-    }
-
-    if (typeof THREE.OrbitControls !== "function") {
-        throw new Error("THREE.OrbitControls is not loaded.");
-    }
-
     const canvas = document.getElementById("infiniteCanvas");
+
     const coordinateX = document.getElementById("coordinateX");
+
     const coordinateY = document.getElementById("coordinateY");
 
     if (!canvas) {
-        throw new Error('Canvas "#infiniteCanvas" was not found.');
+        throw new Error(
+            'Canvas element with ID "infiniteCanvas" was not found.'
+        );
     }
 
-    const scene = new THREE.Scene();
-
-    scene.background = new THREE.Color(0x0b0b0e);
-
-    const camera = new THREE.PerspectiveCamera(
-        55,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        100000
-    );
-
-    camera.position.set(0, 35, 35);
-    camera.lookAt(0, 0, 0);
-
-    const renderer = new THREE.WebGLRenderer({
-        canvas: canvas,
-        antialias: true,
-        alpha: false,
-        powerPreference: "high-performance"
+    const ctx = canvas.getContext("2d", {
+        alpha: false
     });
 
-    renderer.setPixelRatio(
-        Math.min(window.devicePixelRatio || 1, 2)
+    if (!ctx) {
+        throw new Error(
+            "The browser does not support the Canvas 2D context."
+        );
+    }
+
+    let width = window.innerWidth;
+
+    let height = window.innerHeight;
+
+    let devicePixelRatio = Math.min(
+        window.devicePixelRatio || 1,
+        2
     );
 
-    renderer.setSize(
-        window.innerWidth,
-        window.innerHeight
-    );
+    const GRID_SIZE = 50;
 
-    renderer.setClearColor(0x0b0b0e, 1);
+    const MIN_ZOOM = 0.15;
 
-    const controls = new THREE.OrbitControls(
-        camera,
-        renderer.domElement
-    );
+    const MAX_ZOOM = 5;
 
-    controls.enableRotate = false;
-    controls.enablePan = true;
-    controls.enableZoom = true;
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.12;
-    controls.screenSpacePanning = true;
+    const ZOOM_SMOOTHING = 0.16;
 
-    controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
-    controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
-    controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+    const PAN_SMOOTHING = 0.18;
 
-    controls.zoomSpeed = 1.2;
-    controls.panSpeed = 1.2;
-    controls.minDistance = 3;
-    controls.maxDistance = 5000;
+    const GRID_MINOR_COLOR = "rgba(255, 255, 255, 0.045)";
 
-    const ambientLight = new THREE.AmbientLight(
-        0xffffff,
-        1.5
-    );
+    const GRID_MAJOR_COLOR = "rgba(255, 255, 255, 0.09)";
 
-    scene.add(ambientLight);
+    const AXIS_COLOR = "rgba(0, 229, 255, 0.18)";
 
-    const gridSize = 1000;
-    const gridDivisions = 100;
+    const BLOCK_COLORS = [
+        "#00eaff",
+        "#00d9ff",
+        "#ff1744",
+        "#ff3860"
+    ];
 
-    const grid = new THREE.GridHelper(
-        gridSize,
-        gridDivisions,
-        0x77777f,
-        0x36363d
-    );
+    const blocks = new Map();
 
-    grid.position.set(0, 0, 0);
+    let offsetX = 0;
 
-    scene.add(grid);
+    let offsetY = 0;
 
-    const floorGeometry = new THREE.PlaneGeometry(
-        200000,
-        200000
-    );
+    let targetOffsetX = 0;
 
-    const floorMaterial = new THREE.MeshBasicMaterial({
-        transparent: true,
-        opacity: 0,
-        side: THREE.DoubleSide,
-        depthWrite: false
-    });
+    let targetOffsetY = 0;
 
-    const floor = new THREE.Mesh(
-        floorGeometry,
-        floorMaterial
-    );
+    let zoom = 1;
 
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = 0;
+    let targetZoom = 1;
 
-    scene.add(floor);
+    let isDragging = false;
 
-    const objectsGroup = new THREE.Group();
+    let dragMoved = false;
 
-    scene.add(objectsGroup);
-
-    const cubeGeometry = new THREE.BoxGeometry(
-        1,
-        1,
-        1
-    );
-
-    const cubes = [];
-
-    const raycaster = new THREE.Raycaster();
-
-    const mouse = new THREE.Vector2();
-
-    const raycastPoint = new THREE.Vector3();
-
-    let pointerDownX = 0;
-    let pointerDownY = 0;
     let pointerDownTime = 0;
-    let pointerMoved = false;
 
-    const clickMovementThreshold = 6;
-    const clickTimeThreshold = 350;
+    let pointerStartX = 0;
 
-    function updateMouseCoordinates(event) {
-        const rect = renderer.domElement.getBoundingClientRect();
+    let pointerStartY = 0;
 
-        mouse.x =
-            ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    let dragStartOffsetX = 0;
 
-        mouse.y =
-            -((event.clientY - rect.top) / rect.height) * 2 + 1;
-    }
+    let dragStartOffsetY = 0;
 
-    function getFloorIntersection(event) {
-        updateMouseCoordinates(event);
+    let lastPointerX = 0;
 
-        raycaster.setFromCamera(
-            mouse,
-            camera
+    let lastPointerY = 0;
+
+    let animationFrameId = 0;
+
+    function resizeCanvas() {
+        width = window.innerWidth;
+
+        height = window.innerHeight;
+
+        devicePixelRatio = Math.min(
+            window.devicePixelRatio || 1,
+            2
         );
 
-        const intersections =
-            raycaster.intersectObject(
-                floor,
-                false
-            );
+        canvas.style.width = width + "px";
 
-        if (intersections.length === 0) {
-            return null;
-        }
+        canvas.style.height = height + "px";
 
-        raycastPoint.copy(
-            intersections[0].point
+        canvas.width = Math.floor(
+            width * devicePixelRatio
         );
 
-        return raycastPoint.clone();
+        canvas.height = Math.floor(
+            height * devicePixelRatio
+        );
+
+        ctx.setTransform(
+            devicePixelRatio,
+            0,
+            0,
+            devicePixelRatio,
+            0,
+            0
+        );
+
+        render();
     }
 
-    function roundToGrid(value) {
-        return Math.round(value);
+    function screenToWorld(screenX, screenY) {
+        return {
+            x:
+                (screenX - width / 2) / zoom +
+                offsetX,
+
+            y:
+                (screenY - height / 2) / zoom +
+                offsetY
+        };
     }
 
-    function cubeExistsAt(x, z) {
-        for (let i = 0; i < cubes.length; i++) {
-            const cube = cubes[i];
+    function worldToScreen(worldX, worldY) {
+        return {
+            x:
+                (worldX - offsetX) * zoom +
+                width / 2,
 
-            if (
-                cube.userData.gridX === x &&
-                cube.userData.gridZ === z
-            ) {
-                return true;
-            }
-        }
-
-        return false;
+            y:
+                (worldY - offsetY) * zoom +
+                height / 2
+        };
     }
 
-    function createNeonCube(x, z) {
-        if (cubeExistsAt(x, z)) {
+    function getPointerPosition(event) {
+        const rect = canvas.getBoundingClientRect();
+
+        return {
+            x: event.clientX - rect.left,
+
+            y: event.clientY - rect.top
+        };
+    }
+
+    function getGridCoordinate(worldX, worldY) {
+        return {
+            x: Math.round(
+                worldX / GRID_SIZE
+            ),
+
+            y: Math.round(
+                worldY / GRID_SIZE
+            )
+        };
+    }
+
+    function getBlockKey(gridX, gridY) {
+        return gridX + "," + gridY;
+    }
+
+    function createBlock(gridX, gridY) {
+        const key = getBlockKey(
+            gridX,
+            gridY
+        );
+
+        if (blocks.has(key)) {
             return;
         }
 
-        const neonColors = [
-            0xff1744,
-            0x00eaff
-        ];
-
         const color =
-            neonColors[
+            BLOCK_COLORS[
                 Math.floor(
-                    Math.random() * neonColors.length
+                    Math.random() *
+                    BLOCK_COLORS.length
                 )
             ];
 
-        const material = new THREE.MeshBasicMaterial({
-            color: color
-        });
-
-        const cube = new THREE.Mesh(
-            cubeGeometry,
-            material
-        );
-
-        cube.position.set(
-            x,
-            0.5,
-            z
-        );
-
-        cube.scale.set(
-            0.001,
-            0.001,
-            0.001
-        );
-
-        cube.userData.gridX = x;
-        cube.userData.gridZ = z;
-        cube.userData.targetScale = 1;
-        cube.userData.spawnProgress = 0;
-
-        const glowMaterial = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 0.12,
-            side: THREE.BackSide,
-            depthWrite: false
-        });
-
-        const glowGeometry = new THREE.BoxGeometry(
-            1.18,
-            1.18,
-            1.18
-        );
-
-        const glow = new THREE.Mesh(
-            glowGeometry,
-            glowMaterial
-        );
-
-        glow.scale.set(
-            0.001,
-            0.001,
-            0.001
-        );
-
-        cube.add(glow);
-
-        cube.userData.glow = glow;
-
-        objectsGroup.add(cube);
-
-        cubes.push(cube);
-    }
-
-    function handleCanvasClick(event) {
-        const point = getFloorIntersection(event);
-
-        if (!point) {
-            return;
-        }
-
-        const gridX = roundToGrid(point.x);
-        const gridZ = roundToGrid(point.z);
-
-        createNeonCube(
-            gridX,
-            gridZ
+        blocks.set(
+            key,
+            {
+                x: gridX,
+                y: gridY,
+                color: color
+            }
         );
     }
 
-    window.addEventListener(
-        "pointerdown",
-        function (event) {
-            if (
-                event.target !== canvas &&
-                event.target !== renderer.domElement
-            ) {
-                return;
-            }
+    function drawBackground() {
+        ctx.fillStyle = "#0d0e12";
 
-            if (event.button !== 0) {
-                return;
-            }
-
-            pointerDownX = event.clientX;
-            pointerDownY = event.clientY;
-            pointerDownTime = performance.now();
-            pointerMoved = false;
-        }
-    );
-
-    window.addEventListener(
-        "pointermove",
-        function (event) {
-            const deltaX =
-                event.clientX - pointerDownX;
-
-            const deltaY =
-                event.clientY - pointerDownY;
-
-            const distance =
-                Math.sqrt(
-                    deltaX * deltaX +
-                    deltaY * deltaY
-                );
-
-            if (
-                distance >
-                clickMovementThreshold
-            ) {
-                pointerMoved = true;
-            }
-        }
-    );
-
-    window.addEventListener(
-        "pointerup",
-        function (event) {
-            if (
-                event.target !== canvas &&
-                event.target !== renderer.domElement
-            ) {
-                return;
-            }
-
-            if (event.button !== 0) {
-                return;
-            }
-
-            const duration =
-                performance.now() -
-                pointerDownTime;
-
-            if (
-                !pointerMoved &&
-                duration <= clickTimeThreshold
-            ) {
-                handleCanvasClick(event);
-            }
-        }
-    );
-
-    window.addEventListener(
-        "pointercancel",
-        function () {
-            pointerMoved = true;
-        }
-    );
-
-    function updateInfiniteGrid() {
-        const centerX = controls.target.x;
-        const centerZ = controls.target.z;
-
-        const halfGrid = gridSize / 2;
-
-        const snappedX =
-            Math.floor(
-                centerX / gridSize
-            ) * gridSize;
-
-        const snappedZ =
-            Math.floor(
-                centerZ / gridSize
-            ) * gridSize;
-
-        grid.position.x =
-            snappedX + halfGrid;
-
-        grid.position.z =
-            snappedZ + halfGrid;
-    }
-
-    function updateCoordinates() {
-        if (coordinateX) {
-            coordinateX.innerText =
-                Math.round(camera.position.x).toString();
-        }
-
-        if (coordinateY) {
-            coordinateY.innerText =
-                Math.round(camera.position.z).toString();
-        }
-    }
-
-    function updateCubes() {
-        for (let i = 0; i < cubes.length; i++) {
-            const cube = cubes[i];
-
-            if (
-                cube.userData.spawnProgress < 1
-            ) {
-                cube.userData.spawnProgress += 0.08;
-
-                if (
-                    cube.userData.spawnProgress > 1
-                ) {
-                    cube.userData.spawnProgress = 1;
-                }
-
-                const progress =
-                    cube.userData.spawnProgress;
-
-                const easedProgress =
-                    1 -
-                    Math.pow(
-                        1 - progress,
-                        3
-                    );
-
-                cube.scale.set(
-                    easedProgress,
-                    easedProgress,
-                    easedProgress
-                );
-
-                if (cube.userData.glow) {
-                    cube.userData.glow.scale.set(
-                        easedProgress,
-                        easedProgress,
-                        easedProgress
-                    );
-                }
-            }
-        }
-    }
-
-    function handleResize() {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-
-        camera.aspect =
-            width / height;
-
-        camera.updateProjectionMatrix();
-
-        renderer.setPixelRatio(
-            Math.min(
-                window.devicePixelRatio || 1,
-                2
-            )
-        );
-
-        renderer.setSize(
+        ctx.fillRect(
+            0,
+            0,
             width,
             height
         );
     }
 
-    window.addEventListener(
-        "resize",
-        handleResize
-    );
+    function drawGrid() {
+        const worldLeft =
+            offsetX -
+            width / (2 * zoom);
 
-    function animate() {
-        requestAnimationFrame(animate);
+        const worldRight =
+            offsetX +
+            width / (2 * zoom);
 
-        controls.update();
+        const worldTop =
+            offsetY -
+            height / (2 * zoom);
 
-        updateInfiniteGrid();
+        const worldBottom =
+            offsetY +
+            height / (2 * zoom);
+
+        const firstVertical =
+            Math.floor(
+                worldLeft / GRID_SIZE
+            ) - 1;
+
+        const lastVertical =
+            Math.ceil(
+                worldRight / GRID_SIZE
+            ) + 1;
+
+        const firstHorizontal =
+            Math.floor(
+                worldTop / GRID_SIZE
+            ) - 1;
+
+        const lastHorizontal =
+            Math.ceil(
+                worldBottom / GRID_SIZE
+            ) + 1;
+
+        const centerX =
+            width / 2 -
+            offsetX * zoom;
+
+        const centerY =
+            height / 2 -
+            offsetY * zoom;
+
+        ctx.save();
+
+        ctx.lineWidth = 1;
+
+        ctx.beginPath();
+
+        for (
+            let gridX = firstVertical;
+            gridX <= lastVertical;
+            gridX++
+        ) {
+            const screenX =
+                width / 2 +
+                (gridX * GRID_SIZE - offsetX) *
+                    zoom;
+
+            ctx.moveTo(
+                Math.round(screenX) + 0.5,
+                0
+            );
+
+            ctx.lineTo(
+                Math.round(screenX) + 0.5,
+                height
+            );
+        }
+
+        for (
+            let gridY = firstHorizontal;
+            gridY <= lastHorizontal;
+            gridY++
+        ) {
+            const screenY =
+                height / 2 +
+                (gridY * GRID_SIZE - offsetY) *
+                    zoom;
+
+            ctx.moveTo(
+                0,
+                Math.round(screenY) + 0.5
+            );
+
+            ctx.lineTo(
+                width,
+                Math.round(screenY) + 0.5
+            );
+        }
+
+        ctx.strokeStyle =
+            GRID_MINOR_COLOR;
+
+        ctx.stroke();
+
+        ctx.beginPath();
+
+        for (
+            let gridX = firstVertical;
+            gridX <= lastVertical;
+            gridX++
+        ) {
+            if (gridX % 5 !== 0) {
+                continue;
+            }
+
+            const screenX =
+                width / 2 +
+                (gridX * GRID_SIZE - offsetX) *
+                    zoom;
+
+            ctx.moveTo(
+                Math.round(screenX) + 0.5,
+                0
+            );
+
+            ctx.lineTo(
+                Math.round(screenX) + 0.5,
+                height
+            );
+        }
+
+        for (
+            let gridY = firstHorizontal;
+            gridY <= lastHorizontal;
+            gridY++
+        ) {
+            if (gridY % 5 !== 0) {
+                continue;
+            }
+
+            const screenY =
+                height / 2 +
+                (gridY * GRID_SIZE - offsetY) *
+                    zoom;
+
+            ctx.moveTo(
+                0,
+                Math.round(screenY) + 0.5
+            );
+
+            ctx.lineTo(
+                width,
+                Math.round(screenY) + 0.5
+            );
+        }
+
+        ctx.strokeStyle =
+            GRID_MAJOR_COLOR;
+
+        ctx.stroke();
+
+        ctx.beginPath();
+
+        if (
+            centerX >= 0 &&
+            centerX <= width
+        ) {
+            ctx.moveTo(
+                Math.round(centerX) + 0.5,
+                0
+            );
+
+            ctx.lineTo(
+                Math.round(centerX) + 0.5,
+                height
+            );
+        }
+
+        if (
+            centerY >= 0 &&
+            centerY <= height
+        ) {
+            ctx.moveTo(
+                0,
+                Math.round(centerY) + 0.5
+            );
+
+            ctx.lineTo(
+                width,
+                Math.round(centerY) + 0.5
+            );
+        }
+
+        ctx.strokeStyle =
+            AXIS_COLOR;
+
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    function drawBlock(block) {
+        const worldX =
+            block.x * GRID_SIZE;
+
+        const worldY =
+            block.y * GRID_SIZE;
+
+        const screen =
+            worldToScreen(
+                worldX,
+                worldY
+            );
+
+        const size =
+            GRID_SIZE * zoom;
+
+        const halfSize =
+            size / 2;
+
+        if (
+            screen.x + halfSize < 0 ||
+            screen.x - halfSize > width ||
+            screen.y + halfSize < 0 ||
+            screen.y - halfSize > height
+        ) {
+            return;
+        }
+
+        const glowSize =
+            Math.max(
+                8,
+                size * 0.45
+            );
+
+        ctx.save();
+
+        ctx.shadowColor =
+            block.color;
+
+        ctx.shadowBlur =
+            glowSize;
+
+        ctx.fillStyle =
+            block.color;
+
+        ctx.fillRect(
+            screen.x - halfSize,
+            screen.y - halfSize,
+            size,
+            size
+        );
+
+        ctx.shadowBlur = 0;
+
+        ctx.strokeStyle =
+            "rgba(255, 255, 255, 0.75)";
+
+        ctx.lineWidth =
+            Math.max(
+                1,
+                Math.min(
+                    2,
+                    zoom * 1.5
+                )
+            );
+
+        ctx.strokeRect(
+            screen.x - halfSize + 0.5,
+            screen.y - halfSize + 0.5,
+            Math.max(0, size - 1),
+            Math.max(0, size - 1)
+        );
+
+        if (size > 16) {
+            const innerPadding =
+                Math.max(
+                    2,
+                    size * 0.16
+                );
+
+            ctx.strokeStyle =
+                "rgba(255, 255, 255, 0.24)";
+
+            ctx.lineWidth = 1;
+
+            ctx.strokeRect(
+                screen.x -
+                    halfSize +
+                    innerPadding,
+                screen.y -
+                    halfSize +
+                    innerPadding,
+                size -
+                    innerPadding * 2,
+                size -
+                    innerPadding * 2
+            );
+        }
+
+        ctx.restore();
+    }
+
+    function drawBlocks() {
+        for (const block of blocks.values()) {
+            drawBlock(block);
+        }
+    }
+
+    function drawCenterMarker() {
+        const markerSize = 4;
+
+        const centerScreenX =
+            width / 2;
+
+        const centerScreenY =
+            height / 2;
+
+        ctx.save();
+
+        ctx.fillStyle =
+            "rgba(255, 255, 255, 0.6)";
+
+        ctx.fillRect(
+            centerScreenX -
+                markerSize / 2,
+            centerScreenY -
+                markerSize / 2,
+            markerSize,
+            markerSize
+        );
+
+        ctx.restore();
+    }
+
+    function updateCameraSmoothly() {
+        offsetX +=
+            (targetOffsetX - offsetX) *
+            PAN_SMOOTHING;
+
+        offsetY +=
+            (targetOffsetY - offsetY) *
+            PAN_SMOOTHING;
+
+        zoom +=
+            (targetZoom - zoom) *
+            ZOOM_SMOOTHING;
+
+        if (
+            Math.abs(
+                targetOffsetX - offsetX
+            ) < 0.001
+        ) {
+            offsetX = targetOffsetX;
+        }
+
+        if (
+            Math.abs(
+                targetOffsetY - offsetY
+            ) < 0.001
+        ) {
+            offsetY = targetOffsetY;
+        }
+
+        if (
+            Math.abs(
+                targetZoom - zoom
+            ) < 0.0001
+        ) {
+            zoom = targetZoom;
+        }
+    }
+
+    function updateCoordinates() {
+        if (coordinateX) {
+            coordinateX.innerText =
+                Math.round(
+                    offsetX
+                ).toString();
+        }
+
+        if (coordinateY) {
+            coordinateY.innerText =
+                Math.round(
+                    offsetY
+                ).toString();
+        }
+    }
+
+    function render() {
+        ctx.setTransform(
+            devicePixelRatio,
+            0,
+            0,
+            devicePixelRatio,
+            0,
+            0
+        );
+
+        drawBackground();
+
+        drawGrid();
+
+        drawBlocks();
+
+        drawCenterMarker();
+
+        updateCoordinates();
+    }
+
+    function animationLoop() {
+        updateCameraSmoothly();
 
         updateCoordinates();
 
-        updateCubes();
+        render();
 
-        renderer.render(
-            scene,
-            camera
+        animationFrameId =
+            window.requestAnimationFrame(
+                animationLoop
+            );
+    }
+
+    function handlePointerDown(event) {
+        if (event.button !== 0) {
+            return;
+        }
+
+        const position =
+            getPointerPosition(event);
+
+        isDragging = true;
+
+        dragMoved = false;
+
+        pointerDownTime =
+            performance.now();
+
+        pointerStartX =
+            position.x;
+
+        pointerStartY =
+            position.y;
+
+        lastPointerX =
+            position.x;
+
+        lastPointerY =
+            position.y;
+
+        dragStartOffsetX =
+            targetOffsetX;
+
+        dragStartOffsetY =
+            targetOffsetY;
+
+        canvas.style.cursor =
+            "grabbing";
+
+        canvas.setPointerCapture(
+            event.pointerId
         );
     }
 
-    handleResize();
+    function handlePointerMove(event) {
+        if (!isDragging) {
+            return;
+        }
 
-    controls.target.set(
-        0,
-        0,
-        0
+        const position =
+            getPointerPosition(event);
+
+        const totalDeltaX =
+            position.x -
+            pointerStartX;
+
+        const totalDeltaY =
+            position.y -
+            pointerStartY;
+
+        const distance =
+            Math.sqrt(
+                totalDeltaX *
+                    totalDeltaX +
+                totalDeltaY *
+                    totalDeltaY
+            );
+
+        if (distance > 5) {
+            dragMoved = true;
+        }
+
+        const worldDeltaX =
+            (position.x -
+                lastPointerX) /
+            zoom;
+
+        const worldDeltaY =
+            (position.y -
+                lastPointerY) /
+            zoom;
+
+        targetOffsetX -=
+            worldDeltaX;
+
+        targetOffsetY -=
+            worldDeltaY;
+
+        dragStartOffsetX =
+            targetOffsetX;
+
+        dragStartOffsetY =
+            targetOffsetY;
+
+        lastPointerX =
+            position.x;
+
+        lastPointerY =
+            position.y;
+    }
+
+    function handlePointerUp(event) {
+        if (event.button !== 0) {
+            return;
+        }
+
+        const position =
+            getPointerPosition(event);
+
+        const duration =
+            performance.now() -
+            pointerDownTime;
+
+        const wasClick =
+            !dragMoved &&
+            duration < 350;
+
+        isDragging = false;
+
+        canvas.style.cursor =
+            "crosshair";
+
+        if (wasClick) {
+            handleCanvasClick(
+                position.x,
+                position.y
+            );
+        }
+
+        try {
+            canvas.releasePointerCapture(
+                event.pointerId
+            );
+        } catch (error) {
+            void error;
+        }
+    }
+
+    function handlePointerCancel(event) {
+        isDragging = false;
+
+        dragMoved = true;
+
+        canvas.style.cursor =
+            "crosshair";
+
+        try {
+            canvas.releasePointerCapture(
+                event.pointerId
+            );
+        } catch (error) {
+            void error;
+        }
+    }
+
+    function handleCanvasClick(
+        screenX,
+        screenY
+    ) {
+        const world =
+            screenToWorld(
+                screenX,
+                screenY
+            );
+
+        const grid =
+            getGridCoordinate(
+                world.x,
+                world.y
+            );
+
+        createBlock(
+            grid.x,
+            grid.y
+        );
+    }
+
+    function handleWheel(event) {
+        event.preventDefault();
+
+        const position =
+            getPointerPosition(event);
+
+        const worldBeforeZoom =
+            screenToWorld(
+                position.x,
+                position.y
+            );
+
+        const zoomMultiplier =
+            Math.exp(
+                -event.deltaY * 0.001
+            );
+
+        targetZoom *=
+            zoomMultiplier;
+
+        targetZoom =
+            Math.max(
+                MIN_ZOOM,
+                Math.min(
+                    MAX_ZOOM,
+                    targetZoom
+                )
+            );
+
+        const worldAfterZoom =
+            {
+                x:
+                    (position.x -
+                        width / 2) /
+                        targetZoom +
+                    targetOffsetX,
+
+                y:
+                    (position.y -
+                        height / 2) /
+                        targetZoom +
+                    targetOffsetY
+            };
+
+        targetOffsetX +=
+            worldBeforeZoom.x -
+            worldAfterZoom.x;
+
+        targetOffsetY +=
+            worldBeforeZoom.y -
+            worldAfterZoom.y;
+    }
+
+    canvas.addEventListener(
+        "pointerdown",
+        handlePointerDown
     );
 
-    controls.update();
+    canvas.addEventListener(
+        "pointermove",
+        handlePointerMove
+    );
 
-    updateInfiniteGrid();
-    updateCoordinates();
+    canvas.addEventListener(
+        "pointerup",
+        handlePointerUp
+    );
 
-    animate();
+    canvas.addEventListener(
+        "pointercancel",
+        handlePointerCancel
+    );
+
+    canvas.addEventListener(
+        "wheel",
+        handleWheel,
+        {
+            passive: false
+        }
+    );
+
+    window.addEventListener(
+        "resize",
+        resizeCanvas
+    );
+
+    window.addEventListener(
+        "blur",
+        function () {
+            if (isDragging) {
+                isDragging = false;
+
+                dragMoved = true;
+
+                canvas.style.cursor =
+                    "crosshair";
+            }
+        }
+    );
+
+    window.addEventListener(
+        "beforeunload",
+        function () {
+            if (animationFrameId) {
+                window.cancelAnimationFrame(
+                    animationFrameId
+                );
+            }
+        }
+    );
+
+    resizeCanvas();
+
+    render();
+
+    animationLoop();
 })();
