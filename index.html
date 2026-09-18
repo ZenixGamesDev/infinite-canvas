@@ -5,18 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Infinite Canvas</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Подключаем классический Firebase прямо из сети -->
     <script src="https://gstatic.com"></script>
     <script src="https://gstatic.com"></script>
 </head>
 <body>
 
     <div class="top-bar">
-        <div>Бесконечный Холст Мультиплеер (Строим со всем миром!)</div>
+        <div>Infinite Canvas v2.0</div>
         <div class="coordinates">X: <span id="coordinateX">0</span> | Y: <span id="coordinateY">0</span></div>
     </div>
 
     <canvas id="infiniteCanvas"></canvas>
+
+    <!-- Панель инструментов -->
+    <div class="toolbar">
+        <div class="color-dot active" style="background: #00ffcc;" data-color="#00ffcc"></div>
+        <div class="color-dot" style="background: #ff0055;" data-color="#ff0055"></div>
+        <div class="color-dot" style="background: #00ff33;" data-color="#00ff33"></div>
+        <div class="color-dot" style="background: #ffcc00;" data-color="#ffcc00"></div>
+        <div class="color-dot" style="background: #ff00ff;" data-color="#ff00ff"></div>
+        <div class="color-dot" style="background: #ffffff;" data-color="#ffffff"></div>
+        
+        <button id="eraserBtn" class="tool-btn">Ластик</button>
+        <button id="shareBtn" class="tool-btn">Поделиться позицией</button>
+    </div>
 
     <script src="app.js"></script>
 </body>
