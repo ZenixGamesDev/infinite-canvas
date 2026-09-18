@@ -1,10 +1,24 @@
+// Конфигурация Firebase с твоими личными ключами
+const firebaseConfig = {
+    apiKey: "AIzaSyBJD0fM3XErHKGDbvVsE-zlranRK7ABpXM",
+    authDomain: "://firebaseapp.com",
+    databaseURL: "https://firebaseio.com",
+    projectId: "infinite-canvas-db",
+    storageBucket: "infinite-canvas-db.firebasestorage.app",
+    messagingSenderId: "641942476286",
+    appId: "1:641942476286:web:dc5b465b6756a5805a9caf"
+};
+
+// Запуск базы данных Google
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+const blocksRef = database.ref('blocks');
+
 const canvas = document.getElementById('infiniteCanvas');
 const ctx = canvas.getContext('2d');
-
 const coordXEl = document.getElementById('coordinateX');
 const coordYEl = document.getElementById('coordinateY');
 
-// Настройки холста
 let cameraX = 0;
 let cameraY = 0;
 let zoom = 1.0;
@@ -12,10 +26,9 @@ let isDragging = false;
 let startX = 0;
 let startY = 0;
 
-// Хранилище блоков (ключ: "x,y", значение: цвет)
-const blocks = new Map();
+// Локальное хранилище блоков в браузере
+const localBlocks = new Map();
 
-// Авто-размер под экран
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -23,7 +36,19 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', resizeCanvas);
 
-// Перетаскивание мышкой (Панорамирование)
+// Мгновенно ловим блоки от других игроков по всему миру
+blocksRef.on('value', (snapshot) => {
+    localBlocks.clear();
+    const data = snapshot.val();
+    if (data) {
+        Object.keys(data).forEach(key => {
+            localBlocks.set(key, data[key]);
+        });
+    }
+    draw();
+});
+
+// Управление мышкой (перетаскивание)
 canvas.addEventListener('mousedown', (e) => {
     isDragging = true;
     startX = e.clientX;
@@ -45,62 +70,50 @@ canvas.addEventListener('mousemove', (e) => {
     }
 });
 
-window.addEventListener('mouseup', () => {
-    isDragging = false;
-});
+window.addEventListener('mouseup', () => { isDragging = false; });
 
-// Клик — ставим или убираем блок
+// Клик — отправляем блок в базу данных Firebase
 canvas.addEventListener('click', (e) => {
     if (Math.abs(e.clientX - startX) > 3 || Math.abs(e.clientY - startY) > 3) return;
 
-    // Вычисляем координаты клика в мире с учетом зума и камеры
     const worldX = (e.clientX - canvas.width / 2) / zoom + cameraX;
     const worldY = (e.clientY - canvas.height / 2) / zoom + cameraY;
 
-    // Привязка к сетке (размер блока 40 пикселей)
     const gridSize = 40;
     const blockX = Math.floor(worldX / gridSize);
     const blockY = Math.floor(worldY / gridSize);
-    const key = `${blockX},${blockY}`;
+    const key = `${blockX}_${blockY}`;
 
-    if (blocks.has(key)) {
-        blocks.delete(key); // Если блок есть — удаляем
+    if (localBlocks.has(key)) {
+        // Удаляем блок из облака
+        database.ref('blocks/' + key).remove();
     } else {
-        // Случайный неоновый цвет для блока
+        // Добавляем блок со случайным неоновым цветом в облако
         const colors = ['#00ffcc', '#ff0055', '#00ff33', '#ffcc00', '#ff00ff'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
-        blocks.set(key, randomColor);
+        database.ref('blocks/' + key).set(randomColor);
     }
-    draw();
 });
 
-// Зум колесиком мыши
+// Зум колесиком
 canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    if (e.deltaY < 0) {
-        zoom *= 1.1;
-    } else {
-        zoom /= 1.1;
-    }
-    // Ограничение зума
+    if (e.deltaY < 0) zoom *= 1.1; else zoom /= 1.1;
     zoom = Math.max(0.2, Math.min(zoom, 5));
     draw();
 }, { passive: false });
 
-// Функция отрисовки мира
+// Рисование холста
 function draw() {
     ctx.fillStyle = '#0d0e12';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
-    // Сдвигаем рисование в центр экрана
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(zoom, zoom);
     ctx.translate(-cameraX, -cameraY);
 
     const gridSize = 40;
-
-    // Рисуем сетку (динамически вокруг камеры)
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.lineWidth = 1 / zoom;
     
@@ -110,23 +123,15 @@ function draw() {
     const endGridY = Math.ceil((cameraY + canvas.height / 2 / zoom) / gridSize) * gridSize;
 
     for (let x = startGridX; x <= endGridX; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x, startGridY);
-        ctx.lineTo(x, endGridY);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, startGridY); ctx.lineTo(x, endGridY); ctx.stroke();
     }
     for (let y = startGridY; y <= endGridY; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(startGridX, y);
-        ctx.lineTo(endGridX, y);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(startGridX, y); ctx.lineTo(endGridX, y); ctx.stroke();
     }
 
-    // Рисуем все поставленные блоки
-    blocks.forEach((color, key) => {
-        const [bx, by] = key.split(',').map(Number);
+    localBlocks.forEach((color, key) => {
+        const [bx, by] = key.split('_').map(Number);
         ctx.fillStyle = color;
-        // Эффект свечения
         ctx.shadowBlur = 10;
         ctx.shadowColor = color;
         ctx.fillRect(bx * gridSize + 1, by * gridSize + 1, gridSize - 2, gridSize - 2);
@@ -135,5 +140,4 @@ function draw() {
     ctx.restore();
 }
 
-// Первый запуск
 resizeCanvas();
